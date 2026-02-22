@@ -6,10 +6,10 @@ import '../models/movimiento.dart';
 class ApiService {
 
   // 🔥 Para Flutter Web (Chrome) - Produccion
-  // static const String baseUrl = "https://finanzas-backend-u3gy.onrender.com";
+   static const String baseUrl = "https://finanzas-backend-u3gy.onrender.com";
 
   // 🔥 Para Flutter Web (Chrome) - Desarrollo
-  static const String baseUrl = "http://127.0.0.1:8000";
+  //static const String baseUrl = "http://127.0.0.1:8000";
 
   // ==========================
   // LOGIN
@@ -185,5 +185,25 @@ Future<bool> editarMovimiento({
 
   return response.statusCode == 200;
 }
+
+  // ==========================
+  //Registrar por Voz
+  // ==========================
+
+    static Future<bool> registrarTexto(String texto) async {
+      final token = await getToken();
+
+      final response = await http.post(
+        Uri.parse("$baseUrl/registrar-texto/"),
+        headers: {
+          "Authorization": "Bearer $token",
+          "Content-Type": "application/json",
+        },
+        body: jsonEncode({"texto": texto}),
+      );
+
+      return response.statusCode == 200;
+    }
+
 
 }

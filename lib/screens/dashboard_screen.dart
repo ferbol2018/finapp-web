@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:speech_to_text/speech_to_text.dart' as stt;
 import '../models/movimiento.dart';
 import '../services/api_service.dart';
 import '../widgets/crear_movimiento_dialog.dart';
@@ -15,6 +16,9 @@ class DashboardScreen extends StatefulWidget {
 
 class _DashboardScreenState extends State<DashboardScreen> {
   late Future<List<Movimiento>> movimientos;
+  
+  late stt.SpeechToText speech;
+  bool escuchando = false;
 
 final formatoCOP = NumberFormat.currency(
   locale: 'es_CO',
@@ -26,11 +30,40 @@ final formatoCOP = NumberFormat.currency(
   void initState() {
     super.initState();
     cargarMovimientos();
+    speech = stt.SpeechToText();
   }
 
   void cargarMovimientos() {
     movimientos = ApiService.obtenerMovimientos();
   }
+
+  Future<void> escucharVoz() async {
+  bool disponible = await speech.initialize();
+
+  if (disponible) {
+    setState(() => escuchando = true);
+
+    speech.listen(
+      localeId: "es_CO",
+      onResult: (result) async {
+        if (result.finalResult) {
+          setState(() => escuchando = false);
+
+          final texto = result.recognizedWords;
+          print("🎤 TEXTO: $texto");
+
+          final ok = await ApiService.registrarTexto(texto);
+
+          if (ok) {
+            setState(() {
+              cargarMovimientos();
+            });
+          }
+        }
+      },
+    );
+  }
+}
 
   void _abrirDialogEditar(Movimiento mov) {
   showDialog(
@@ -222,20 +255,38 @@ Container(
           );
         },
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          showDialog(
-            context: context,
-            builder: (_) => CrearMovimientoDialog(
-              onSuccess: () {
-                setState(() {
-                  cargarMovimientos();
-                });
-              }, movimiento: null,
-            ),
-          );
-        },
-        child: const Icon(Icons.add),
+      floatingActionButton: Column(
+        mainAxisAlignment: MainAxisAlignment.end,
+        children: [
+
+          // 🎤 BOTÓN VOZ (nuevo)
+          FloatingActionButton(
+            heroTag: "voz",
+            backgroundColor: escuchando ? Colors.red : Colors.blue,
+            child: Icon(escuchando ? Icons.mic_off : Icons.mic),
+            onPressed: escucharVoz,
+          ),
+
+          const SizedBox(height: 10),
+
+          // ➕ BOTÓN MANUAL (EL TUYO ORIGINAL)
+          FloatingActionButton(
+            heroTag: "crear",
+            child: const Icon(Icons.add),
+            onPressed: () {
+              showDialog(
+                context: context,
+                builder: (_) => CrearMovimientoDialog(
+                  onSuccess: () {
+                    setState(() {
+                      cargarMovimientos();
+                    });
+                  },
+                ),
+              );
+            },
+          ),
+        ],
       ),
     );
   }
