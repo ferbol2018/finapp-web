@@ -1,11 +1,15 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import '../models/movimiento.dart';
 
 class ApiService {
 
-  // 🔥 Para Flutter Web (Chrome)
-  static const String baseUrl = "https://finanzas-backend-u3gy.onrender.com";
+  // 🔥 Para Flutter Web (Chrome) - Produccion
+  // static const String baseUrl = "https://finanzas-backend-u3gy.onrender.com";
+
+  // 🔥 Para Flutter Web (Chrome) - Desarrollo
+  static const String baseUrl = "http://127.0.0.1:8000";
 
   // ==========================
   // LOGIN
@@ -63,7 +67,7 @@ class ApiService {
   // ==========================
   // OBTENER MOVIMIENTOS
   // ==========================
-  static Future<List<dynamic>> obtenerMovimientos() async {
+  static Future<List<Movimiento>> obtenerMovimientos() async {
 
     final token = await getToken();
 
@@ -72,7 +76,7 @@ class ApiService {
     }
 
     final response = await http.get(
-      Uri.parse("$baseUrl/movimientos/"),
+      Uri.parse("$baseUrl/movimientos"),
       headers: {
         "Content-Type": "application/json",
         "Authorization": "Bearer $token",
@@ -83,7 +87,8 @@ class ApiService {
     print("BODY: ${response.body}");
 
     if (response.statusCode == 200) {
-      return json.decode(response.body);
+      final List data = json.decode(response.body);
+      return data.map((e) => Movimiento.fromJson(e)).toList();
     } else if (response.statusCode == 401) {
       throw Exception("Token inválido o expirado");
     } else {
@@ -99,4 +104,86 @@ class ApiService {
     await prefs.remove("token");
     print("🚪 TOKEN ELIMINADO");
   }
+
+  // ==========================
+  // CREAR MOVIMIENTO
+  // ==========================
+  Future<bool> crearMovimiento({
+  required int cuentaId,
+  required String tipo,
+  required double monto,
+  required String categoria,
+  required String descripcion,
+}) async {
+
+  final token = await getToken(); // tu función existente
+
+  final response = await http.post(
+    Uri.parse("$baseUrl/movimientos"),
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": "Bearer $token"
+    },
+    body: jsonEncode({
+      "cuenta_id": cuentaId,
+      "tipo": tipo,
+      "monto": monto,
+      "categoria": categoria,
+      "descripcion": descripcion,
+      "transaccion_id": null
+    }),
+  );
+
+  return response.statusCode == 200;
+}
+  // ==========================
+  // ELIMINAR MOVIMIENTO
+  // ==========================
+  static Future<void> eliminarMovimiento(int id) async {
+  final token = await getToken();
+
+  final response = await http.delete(
+    Uri.parse("$baseUrl/movimientos/$id"),
+    headers: {
+      "Authorization": "Bearer $token",
+    },
+  );
+
+  if (response.statusCode != 200) {
+    throw Exception("Error al eliminar movimiento");
+  }
+}
+
+  // ==========================
+  // EDITAR MOVIMIENTO
+  // ==========================
+
+Future<bool> editarMovimiento({
+  required int id,
+  required int cuentaId,
+  required String tipo,
+  required double monto,
+  required String categoria,
+  required String descripcion,
+}) async {
+  final token = await getToken();
+
+  final response = await http.put(
+    Uri.parse("$baseUrl/movimientos/$id"),
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": "Bearer $token"
+    },
+    body: jsonEncode({
+      "cuenta_id": cuentaId,
+      "tipo": tipo,
+      "monto": monto,
+      "categoria": categoria,
+      "descripcion": descripcion,
+    }),
+  );
+
+  return response.statusCode == 200;
+}
+
 }
