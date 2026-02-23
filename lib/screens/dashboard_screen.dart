@@ -19,6 +19,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
   
   late stt.SpeechToText speech;
   bool escuchando = false;
+  double nivelVoz = 0;
+  String textoEscuchado = "";
 
 final formatoCOP = NumberFormat.currency(
   locale: 'es_CO',
@@ -33,36 +35,112 @@ final formatoCOP = NumberFormat.currency(
     speech = stt.SpeechToText();
   }
 
+  @override
+void dispose() {
+  speech.stop(); // 🔥 detener micrófono al salir
+  super.dispose();
+}
+
+void confirmarMovimientoVoz(String texto) {
+  showDialog(
+    context: context,
+    builder: (_) => AlertDialog(
+      title: const Text("Movimiento detectado"),
+      content: Text(texto),
+      actions: [
+
+        TextButton(
+          onPressed: () async {
+            Navigator.pop(context);
+            textoEscuchado = "";
+            await escucharVoz(); // 🔥 repetir
+          },
+          child: const Text("Repetir"),
+        ),
+
+        ElevatedButton(
+          onPressed: () async {
+            Navigator.pop(context);
+
+            final ok = await ApiService.registrarTexto(texto);
+
+            if (ok) {
+              setState(() {
+                textoEscuchado = "";
+                cargarMovimientos();
+              });
+            }
+          },
+          child: const Text("Confirmar"),
+        ),
+      ],
+    ),
+  );
+}
+
   void cargarMovimientos() {
     movimientos = ApiService.obtenerMovimientos();
   }
 
-  Future<void> escucharVoz() async {
-  bool disponible = await speech.initialize();
+Future<void> escucharVoz() async {
 
-  if (disponible) {
-    setState(() => escuchando = true);
-
-    speech.listen(
-      localeId: "es_CO",
-      onResult: (result) async {
-        if (result.finalResult) {
-          setState(() => escuchando = false);
-
-          final texto = result.recognizedWords;
-          print("🎤 TEXTO: $texto");
-
-          final ok = await ApiService.registrarTexto(texto);
-
-          if (ok) {
-            setState(() {
-              cargarMovimientos();
-            });
-          }
-        }
-      },
-    );
+  // 🔥 si ya está escuchando → detener
+  if (escuchando) {
+    await speech.stop();
+    setState(() => escuchando = false);
+    return;
   }
+
+bool disponible = await speech.initialize(
+onError: (error) {
+print("❌ ERROR VOZ: $error");
+setState(() => escuchando = false);
+},
+onStatus: (status) {
+print("🎤 STATUS: $status");
+
+  if (status == "done" || status == "notListening") {
+    setState(() => escuchando = false);
+  }
+},
+
+);
+
+  if (!disponible) return;
+
+  setState(() => escuchando = true);
+
+  setState(() => textoEscuchado = "");
+
+
+// 🔥 cancelar cualquier sesión previa (clave en web)
+await speech.cancel();
+
+speech.listen(
+  localeId: "es_CO",
+  cancelOnError: true,
+  partialResults: false,
+
+onResult: (result) async {
+
+  setState(() {
+    textoEscuchado = result.recognizedWords;
+  });
+
+  if (!result.finalResult) return;
+
+  await speech.stop();
+  setState(() => escuchando = false);
+
+  confirmarMovimientoVoz(textoEscuchado);
+},
+
+  // ⭐⭐⭐ ESTE ARREGLA EL BUG WEB
+  onSoundLevelChange: (level) {
+  setState(() => nivelVoz = level);
+},
+
+);
 }
 
   void _abrirDialogEditar(Movimiento mov) {
@@ -167,6 +245,33 @@ Container(
     ],
   ),
 ),
+
+
+if (escuchando)
+  const Padding(
+    padding: EdgeInsets.all(8),
+    child: Text(
+      "🎤 Escuchando...",
+      style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
+    ),
+  ),
+
+  if (textoEscuchado.isNotEmpty)
+  Padding(
+    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+    child: Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.black.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Text(
+        textoEscuchado,
+        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+      ),
+    ),
+  ),
+
 
               // 🔹 LISTA DE MOVIMIENTOS
               Expanded(
