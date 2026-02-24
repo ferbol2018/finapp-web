@@ -6,7 +6,7 @@ import '../models/movimiento.dart';
 class ApiService {
 
   // 🔥 Para Flutter Web (Chrome) - Produccion
-   static const String baseUrl = "https://finanzas-backend-u3gy.onrender.com";
+  static const String baseUrl = "https://finanzas-backend-u3gy.onrender.com";
 
   // 🔥 Para Flutter Web (Chrome) - Desarrollo
   //static const String baseUrl = "http://127.0.0.1:8000";
@@ -194,7 +194,7 @@ Future<bool> editarMovimiento({
       final token = await getToken();
 
       final response = await http.post(
-        Uri.parse("$baseUrl/registrar-texto/"),
+        Uri.parse("$baseUrl/movimientos/registrar-texto"),
         headers: {
           "Authorization": "Bearer $token",
           "Content-Type": "application/json",
@@ -204,6 +204,26 @@ Future<bool> editarMovimiento({
 
       return response.statusCode == 200;
     }
+
+static Future<Map<String, dynamic>> analizarTexto(String texto) async {
+  final response = await http.post(
+    Uri.parse("$baseUrl/movimientos/analizar-texto"),
+    headers: await _headers(),   // ✅ AWAIT
+    body: jsonEncode({"texto": texto}),
+  );
+
+  return jsonDecode(response.body);
+}
+
+static Future<Map<String, String>> _headers() async {
+  final token = await getToken();
+
+  return {
+    "Content-Type": "application/json",
+    "Authorization": "Bearer $token",
+  };
+}
+    
 
 
 }

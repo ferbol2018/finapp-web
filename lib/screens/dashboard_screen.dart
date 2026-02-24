@@ -41,35 +41,40 @@ void dispose() {
   super.dispose();
 }
 
-void confirmarMovimientoVoz(String texto) {
+Future<void> confirmarMovimientoVoz(String texto) async {
+
+  final analisis = await ApiService.analizarTexto(texto);
+
   showDialog(
     context: context,
     builder: (_) => AlertDialog(
       title: const Text("Movimiento detectado"),
-      content: Text(texto),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text("Tipo: ${analisis["tipo"]}"),
+          Text("Monto: \$${analisis["monto"]}"),
+          Text("Categoría: ${analisis["categoria"]}"),
+          const SizedBox(height: 8),
+          Text("Descripción: ${analisis["descripcion"]}"),
+        ],
+      ),
       actions: [
-
         TextButton(
-          onPressed: () async {
+          onPressed: () {
             Navigator.pop(context);
-            textoEscuchado = "";
-            await escucharVoz(); // 🔥 repetir
+            escucharVoz();
           },
           child: const Text("Repetir"),
         ),
-
         ElevatedButton(
           onPressed: () async {
             Navigator.pop(context);
 
-            final ok = await ApiService.registrarTexto(texto);
+            await ApiService.registrarTexto(texto);
 
-            if (ok) {
-              setState(() {
-                textoEscuchado = "";
-                cargarMovimientos();
-              });
-            }
+            setState(() => cargarMovimientos());
           },
           child: const Text("Confirmar"),
         ),
@@ -118,28 +123,24 @@ await speech.cancel();
 
 speech.listen(
   localeId: "es_CO",
+  partialResults: true,   // 🔥 importante
+  listenFor: const Duration(seconds: 10), // 🔥 más tiempo
+  pauseFor: const Duration(seconds: 3),   // 🔥 tolera silencio
   cancelOnError: true,
-  partialResults: false,
+  onResult: (result) async {
+    final texto = result.recognizedWords;
 
-onResult: (result) async {
+    setState(() {
+      textoEscuchado = texto; // 👈 mostrar en pantalla
+    });
 
-  setState(() {
-    textoEscuchado = result.recognizedWords;
-  });
+    if (result.finalResult && texto.isNotEmpty) {
+      await speech.stop();
+      setState(() => escuchando = false);
 
-  if (!result.finalResult) return;
-
-  await speech.stop();
-  setState(() => escuchando = false);
-
-  confirmarMovimientoVoz(textoEscuchado);
-},
-
-  // ⭐⭐⭐ ESTE ARREGLA EL BUG WEB
-  onSoundLevelChange: (level) {
-  setState(() => nivelVoz = level);
-},
-
+      confirmarMovimientoVoz(texto);
+    }
+  },
 );
 }
 
