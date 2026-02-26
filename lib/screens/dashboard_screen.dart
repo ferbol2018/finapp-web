@@ -43,7 +43,7 @@ void dispose() {
 
 Future<void> confirmarMovimientoVoz(String texto) async {
 
-  final analisis = await ApiService.analizarTexto(texto);
+  final data = await ApiService.analizarTexto(texto);
 
   showDialog(
     context: context,
@@ -53,17 +53,22 @@ Future<void> confirmarMovimientoVoz(String texto) async {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text("Tipo: ${analisis["tipo"]}"),
-          Text("Monto: \$${analisis["monto"]}"),
-          Text("Categoría: ${analisis["categoria"]}"),
+          Text("Tipo: ${data["tipo"]}"),
+          Text("Monto: \$${data["monto"]}"),
+          Text("Categoría: ${data["categoria"]}"),
           const SizedBox(height: 8),
-          Text("Descripción: ${analisis["descripcion"]}"),
+          Text("Descripción: ${data["descripcion"]}"),
         ],
       ),
       actions: [
         TextButton(
           onPressed: () {
             Navigator.pop(context);
+
+            setState(() {
+              textoEscuchado = ""; // 🔥 limpiar
+            });
+
             escucharVoz();
           },
           child: const Text("Repetir"),
@@ -72,16 +77,25 @@ Future<void> confirmarMovimientoVoz(String texto) async {
           onPressed: () async {
             Navigator.pop(context);
 
-            await ApiService.registrarTexto(texto);
+            setState(() {
+              textoEscuchado = ""; // 🔥 limpiar
+            });
 
+            await ApiService.registrarTexto(texto);
             setState(() => cargarMovimientos());
           },
           child: const Text("Confirmar"),
         ),
       ],
     ),
-  );
+  ).then((_) {
+    // 🔥 SE EJECUTA SIEMPRE (confirmar, cancelar o tocar fuera)
+    setState(() {
+      textoEscuchado = "";
+    });
+  });
 }
+
 
   void cargarMovimientos() {
     movimientos = ApiService.obtenerMovimientos();
@@ -90,11 +104,16 @@ Future<void> confirmarMovimientoVoz(String texto) async {
 Future<void> escucharVoz() async {
 
   // 🔥 si ya está escuchando → detener
-  if (escuchando) {
-    await speech.stop();
-    setState(() => escuchando = false);
-    return;
-  }
+if (escuchando) {
+  await speech.stop();
+
+  setState(() {
+    escuchando = false;
+    textoEscuchado = ""; // 🔥 limpiar preview
+  });
+
+  return;
+}
 
 bool disponible = await speech.initialize(
 onError: (error) {
@@ -138,7 +157,9 @@ speech.listen(
       await speech.stop();
       setState(() => escuchando = false);
 
+      //final datos = await ApiService.analizarTexto(texto);
       confirmarMovimientoVoz(texto);
+      
     }
   },
 );

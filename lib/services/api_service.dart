@@ -206,24 +206,19 @@ Future<bool> editarMovimiento({
     }
 
 static Future<Map<String, dynamic>> analizarTexto(String texto) async {
-  final response = await http.post(
+  final token = await getToken();
+
+  final res = await http.post(
     Uri.parse("$baseUrl/movimientos/analizar-texto"),
-    headers: await _headers(),   // ✅ AWAIT
+    headers: {
+      "Authorization": "Bearer $token",
+      "Content-Type": "application/json",
+    },
     body: jsonEncode({"texto": texto}),
   );
 
-  return jsonDecode(response.body);
+  return jsonDecode(res.body);
 }
-
-static Future<Map<String, String>> _headers() async {
-  final token = await getToken();
-
-  return {
-    "Content-Type": "application/json",
-    "Authorization": "Bearer $token",
-  };
-}
-    
 
 
 }
