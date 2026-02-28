@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
+import '../navigation/main_navigation.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -9,129 +10,72 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
+
   final emailController = TextEditingController();
   final passwordController = TextEditingController();
-
-  bool loading = false;
+  bool cargando = false;
 
   Future<void> login() async {
-    if (emailController.text.isEmpty ||
-        passwordController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("Completa todos los campos"),
+    setState(() => cargando = true);
+
+    final nombre = await ApiService.login(
+      emailController.text,
+      passwordController.text,
+    );
+
+    setState(() => cargando = false);
+
+    if (nombre != null) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (_) => MainNavigation(nombre: nombre),
         ),
       );
-      return;
-    }
-
-    setState(() => loading = true);
-
-    try {
-      final nombre = await ApiService.login(
-        emailController.text.trim(),
-        passwordController.text.trim(),
-      );
-
-      if (!mounted) return;
-
-      if (nombre != null) {
-        Navigator.pushReplacementNamed(context, "/home");
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text("Credenciales incorrectas"),
-          ),
-        );
-      }
-    } catch (e) {
+    } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text("Error: ${e.toString()}"),
-        ),
+        const SnackBar(content: Text("Credenciales inválidas")),
       );
     }
-
-    setState(() => loading = false);
-  }
-
-  @override
-  void dispose() {
-    emailController.dispose();
-    passwordController.dispose();
-    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey[100],
       body: Center(
-        child: Container(
+        child: SizedBox(
           width: 350,
-          padding: const EdgeInsets.all(25),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(15),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.05),
-                blurRadius: 10,
-              ),
-            ],
-          ),
           child: Column(
-            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
+
               const Text(
                 "Finanzas App",
-                style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                ),
+                style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold),
               ),
 
-              const SizedBox(height: 25),
+              const SizedBox(height: 30),
 
               TextField(
                 controller: emailController,
-                decoration: const InputDecoration(
-                  labelText: "Email",
-                  border: OutlineInputBorder(),
-                ),
+                decoration: const InputDecoration(labelText: "Email"),
               ),
 
-              const SizedBox(height: 15),
+              const SizedBox(height: 10),
 
               TextField(
                 controller: passwordController,
                 obscureText: true,
-                decoration: const InputDecoration(
-                  labelText: "Contraseña",
-                  border: OutlineInputBorder(),
-                ),
+                decoration: const InputDecoration(labelText: "Password"),
               ),
 
               const SizedBox(height: 20),
 
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: loading ? null : login,
-                  style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 15),
-                  ),
-                  child: loading
-                      ? const SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
-                          ),
-                        )
-                      : const Text("Iniciar sesión"),
-                ),
+              ElevatedButton(
+                onPressed: cargando ? null : login,
+                child: cargando
+                    ? const CircularProgressIndicator()
+                    : const Text("Ingresar"),
               ),
             ],
           ),

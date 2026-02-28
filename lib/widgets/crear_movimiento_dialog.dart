@@ -1,6 +1,6 @@
-import 'package:finanzas_app/models/movimiento.dart';
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
+import '../models/movimiento.dart';
 
 class CrearMovimientoDialog extends StatefulWidget {
   final Movimiento? movimiento;
@@ -17,68 +17,67 @@ class CrearMovimientoDialog extends StatefulWidget {
       _CrearMovimientoDialogState();
 }
 
-class _CrearMovimientoDialogState extends State<CrearMovimientoDialog> {
+class _CrearMovimientoDialogState
+    extends State<CrearMovimientoDialog> {
 
-  final _montoController = TextEditingController();
-  final _descripcionController = TextEditingController();
+  final montoController = TextEditingController();
+  final descripcionController = TextEditingController();
 
-  String tipo = "ingreso";
+  String tipo = "gasto";
   final api = ApiService();
 
-  // 🔥 IMPORTANTE → detectar modo edición
   @override
   void initState() {
     super.initState();
 
     if (widget.movimiento != null) {
-      _montoController.text = widget.movimiento!.monto.toString();
-      _descripcionController.text = widget.movimiento!.descripcion;
+      montoController.text =
+          widget.movimiento!.monto.toString();
+      descripcionController.text =
+          widget.movimiento!.descripcion;
       tipo = widget.movimiento!.tipo;
     }
   }
 
   Future<void> guardar() async {
-    bool ok;
 
-    // 🔥 CREAR
+    final monto = double.tryParse(montoController.text);
+
+    if (monto == null) return;
+
     if (widget.movimiento == null) {
-      ok = await api.crearMovimiento(
+      await api.crearMovimiento(
         cuentaId: 1,
         tipo: tipo,
-        monto: double.parse(_montoController.text),
+        monto: monto,
         categoria: "General",
-        descripcion: _descripcionController.text,
+        descripcion: descripcionController.text,
       );
-    }
-    // 🔥 EDITAR
-    else {
-      ok = await api.editarMovimiento(
+    } else {
+      await api.editarMovimiento(
         id: widget.movimiento!.id,
         cuentaId: 1,
         tipo: tipo,
-        monto: double.parse(_montoController.text),
+        monto: monto,
         categoria: "General",
-        descripcion: _descripcionController.text,
+        descripcion: descripcionController.text,
       );
     }
 
-    if (ok) {
-      widget.onSuccess();
-      Navigator.pop(context);
-    }
+    widget.onSuccess();
+    Navigator.pop(context);
   }
 
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: Text(
-        widget.movimiento == null
-            ? "Nuevo Movimiento"
-            : "Editar Movimiento",
-      ),
+      title: Text(widget.movimiento == null
+          ? "Nuevo Movimiento"
+          : "Editar Movimiento"),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
+
           DropdownButton<String>(
             value: tipo,
             items: const [
@@ -91,13 +90,15 @@ class _CrearMovimientoDialogState extends State<CrearMovimientoDialog> {
               });
             },
           ),
+
           TextField(
-            controller: _montoController,
-            decoration: const InputDecoration(labelText: "Monto"),
+            controller: montoController,
             keyboardType: TextInputType.number,
+            decoration: const InputDecoration(labelText: "Monto"),
           ),
+
           TextField(
-            controller: _descripcionController,
+            controller: descripcionController,
             decoration: const InputDecoration(labelText: "Descripción"),
           ),
         ],
@@ -109,9 +110,7 @@ class _CrearMovimientoDialogState extends State<CrearMovimientoDialog> {
         ),
         ElevatedButton(
           onPressed: guardar,
-          child: Text(
-            widget.movimiento == null ? "Crear" : "Actualizar",
-          ),
+          child: const Text("Guardar"),
         ),
       ],
     );

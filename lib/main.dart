@@ -1,36 +1,23 @@
 import 'package:flutter/material.dart';
 import 'screens/login_screen.dart';
-import 'screens/dashboard_screen.dart';
 
 void main() {
-  runApp(const MyApp());
+  runApp(const FinanzasApp());
 }
 
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+class FinanzasApp extends StatelessWidget {
+  const FinanzasApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      title: 'Finanzas App',
       debugShowCheckedModeBanner: false,
-      initialRoute: "/",
-      routes: {
-        "/": (context) => const LoginScreen(),
-        "/home": (context) => DashboardScreen(nombre: "Usuario"),
-      },
-    );
-  }
-}
-
-class MainNavigation extends StatelessWidget {
-  const MainNavigation({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return const Scaffold(
-      body: Center(
-        child: Text("Home"),
+      theme: ThemeData(
+        primarySwatch: Colors.green,
+        useMaterial3: true,
       ),
+      home: const LoginScreen(),
     );
   }
 }

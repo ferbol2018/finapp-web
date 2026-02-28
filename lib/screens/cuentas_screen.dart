@@ -5,6 +5,11 @@ class CuentasScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Center(child: Text("Reportes"));
+    return const Center(
+      child: Text(
+        "Cuentas (Próximamente)",
+        style: TextStyle(fontSize: 18),
+      ),
+    );
   }
 }
