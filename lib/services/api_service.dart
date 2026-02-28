@@ -208,7 +208,7 @@ Future<bool> editarMovimiento({
 static Future<Map<String, dynamic>> analizarTexto(String texto) async {
   final token = await getToken();
 
-  final res = await http.post(
+  final response = await http.post(
     Uri.parse("$baseUrl/movimientos/analizar-texto"),
     headers: {
       "Authorization": "Bearer $token",
@@ -217,7 +217,11 @@ static Future<Map<String, dynamic>> analizarTexto(String texto) async {
     body: jsonEncode({"texto": texto}),
   );
 
-  return jsonDecode(res.body);
+  if (response.statusCode == 200) {
+    return jsonDecode(response.body);
+  } else {
+    throw Exception("Error al analizar texto");
+  }
 }
 
 

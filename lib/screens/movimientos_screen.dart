@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
+import 'package:audioplayers/audioplayers.dart';
 import '../models/movimiento.dart';
 import '../services/api_service.dart';
 import '../widgets/crear_movimiento_dialog.dart';
 import '../widgets/movimiento_tile.dart';
+import '../services/sound_service.dart';
 
 class MovimientosScreen extends StatefulWidget {
   final String nombre;
@@ -14,18 +16,32 @@ class MovimientosScreen extends StatefulWidget {
   State<MovimientosScreen> createState() => _MovimientosScreenState();
 }
 
-class _MovimientosScreenState extends State<MovimientosScreen> {
-  late Future<List<Movimiento>> movimientosFuture;
+class _MovimientosScreenState extends State<MovimientosScreen>
+    with SingleTickerProviderStateMixin {
 
+  late Future<List<Movimiento>> movimientosFuture;
   late stt.SpeechToText speech;
+  final AudioPlayer player = AudioPlayer();
+
   bool escuchando = false;
   String textoEscuchado = "";
+
+  late AnimationController _animController;
+
+  final SoundService soundService = SoundService();
 
   @override
   void initState() {
     super.initState();
     cargarMovimientos();
     speech = stt.SpeechToText();
+
+    _animController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 800),
+      lowerBound: 0.8,
+      upperBound: 1.2,
+    )..repeat(reverse: true);
   }
 
   void cargarMovimientos() {
@@ -35,13 +51,22 @@ class _MovimientosScreenState extends State<MovimientosScreen> {
   @override
   void dispose() {
     speech.stop();
+    _animController.dispose();
     super.dispose();
   }
 
-  // 🎤 ESCUCHAR VOZ
+  Future<void> sonidoInicio() async {
+    await soundService.playStart();
+  }
+
+  Future<void> sonidoFin() async {
+    await soundService.playStop();
+  }
+
   Future<void> escucharVoz() async {
     if (escuchando) {
       await speech.stop();
+      await sonidoFin();
       setState(() {
         escuchando = false;
         textoEscuchado = "";
@@ -49,15 +74,11 @@ class _MovimientosScreenState extends State<MovimientosScreen> {
       return;
     }
 
-    bool disponible = await speech.initialize(
-      onStatus: (status) {
-        if (status == "done" || status == "notListening") {
-          setState(() => escuchando = false);
-        }
-      },
-    );
+    bool disponible = await speech.initialize();
 
     if (!disponible) return;
+
+    await sonidoInicio();
 
     setState(() {
       escuchando = true;
@@ -67,60 +88,63 @@ class _MovimientosScreenState extends State<MovimientosScreen> {
     speech.listen(
       localeId: "es_CO",
       partialResults: true,
-      onResult: (result) {
+      onResult: (result) async {
         setState(() {
           textoEscuchado = result.recognizedWords;
         });
 
         if (result.finalResult) {
-          speech.stop();
+          await speech.stop();
+          await sonidoFin();
           setState(() => escuchando = false);
 
           if (textoEscuchado.isNotEmpty) {
-            mostrarDialogoConfirmacion(textoEscuchado);
+            analizarYConfirmar(textoEscuchado);
           }
         }
       },
     );
   }
 
-  // 📋 DIÁLOGO CONFIRMAR / REPETIR
-  void mostrarDialogoConfirmacion(String texto) {
+  Future<void> analizarYConfirmar(String texto) async {
+    final data = await ApiService.analizarTexto(texto);
+
+    final tipo = data["tipo"];
+    final monto = data["monto"];
+    final categoria = data["categoria"];
+    final descripcion = data["descripcion"];
+
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (_) => AlertDialog(
         title: const Text("Confirmar movimiento"),
-        content: Text(
-          texto,
-          style: const TextStyle(fontSize: 16),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text("Tipo: $tipo"),
+            Text("Monto: \$ $monto"),
+            Text("Categoría: $categoria"),
+            const SizedBox(height: 10),
+            Text(descripcion),
+          ],
         ),
         actions: [
-
-          // ❌ Cancelar
           TextButton(
             onPressed: () {
               Navigator.pop(context);
-              setState(() {
-                textoEscuchado = "";
-              });
+              setState(() => textoEscuchado = "");
             },
             child: const Text("Cancelar"),
           ),
-
-          // 🔁 Repetir
           TextButton(
             onPressed: () {
               Navigator.pop(context);
-              setState(() {
-                textoEscuchado = "";
-              });
+              setState(() => textoEscuchado = "");
               escucharVoz();
             },
             child: const Text("Repetir"),
           ),
-
-          // ✅ Confirmar
           ElevatedButton(
             onPressed: () async {
               Navigator.pop(context);
@@ -147,9 +171,7 @@ class _MovimientosScreenState extends State<MovimientosScreen> {
       context: context,
       builder: (_) => CrearMovimientoDialog(
         onSuccess: () {
-          setState(() {
-            cargarMovimientos();
-          });
+          setState(() => cargarMovimientos());
         },
       ),
     );
@@ -170,7 +192,6 @@ class _MovimientosScreenState extends State<MovimientosScreen> {
           body: Column(
             children: [
 
-              // 🎤 TEXTO EN VIVO
               if (escuchando || textoEscuchado.isNotEmpty)
                 Container(
                   width: double.infinity,
@@ -184,7 +205,6 @@ class _MovimientosScreenState extends State<MovimientosScreen> {
                   ),
                 ),
 
-              // 📋 LISTA
               Expanded(
                 child: ListView.builder(
                   padding: const EdgeInsets.all(12),
@@ -194,29 +214,13 @@ class _MovimientosScreenState extends State<MovimientosScreen> {
 
                     return MovimientoTile(
                       movimiento: mov,
-
-                      // ✏ EDITAR
-                      onEdit: () {
-                        showDialog(
-                          context: context,
-                          builder: (_) => CrearMovimientoDialog(
-                            movimiento: mov,
-                            onSuccess: () {
-                              setState(() {
-                                cargarMovimientos();
-                              });
-                            },
-                          ),
-                        );
-                      },
-
-                      // 🗑 ELIMINAR CON CONFIRMACIÓN
                       onDelete: () async {
                         final confirmar =
                             await showDialog<bool>(
                           context: context,
                           builder: (_) => AlertDialog(
-                            title: const Text("Eliminar movimiento"),
+                            title:
+                                const Text("Eliminar movimiento"),
                             content: const Text(
                                 "¿Seguro que deseas eliminarlo?"),
                             actions: [
@@ -241,9 +245,7 @@ class _MovimientosScreenState extends State<MovimientosScreen> {
                         if (confirmar == true) {
                           await ApiService
                               .eliminarMovimiento(mov.id);
-                          setState(() {
-                            cargarMovimientos();
-                          });
+                          setState(() => cargarMovimientos());
                         }
                       },
                     );
@@ -253,26 +255,26 @@ class _MovimientosScreenState extends State<MovimientosScreen> {
             ],
           ),
 
-          // 🔘 BOTONES
           floatingActionButton: Column(
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
 
-              // 🎤 Voz
-              FloatingActionButton(
-                heroTag: "voz",
-                backgroundColor:
-                    escuchando ? Colors.red : Colors.blue,
-                child: Icon(
-                    escuchando
-                        ? Icons.mic_off
-                        : Icons.mic),
-                onPressed: escucharVoz,
+              ScaleTransition(
+                scale: _animController,
+                child: FloatingActionButton(
+                  heroTag: "voz",
+                  backgroundColor:
+                      escuchando ? Colors.red : Colors.blue,
+                  child: Icon(
+                      escuchando
+                          ? Icons.mic
+                          : Icons.mic_none),
+                  onPressed: escucharVoz,
+                ),
               ),
 
               const SizedBox(height: 10),
 
-              // ➕ Crear manual
               FloatingActionButton(
                 heroTag: "crear",
                 child: const Icon(Icons.add),
